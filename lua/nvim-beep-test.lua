@@ -8,6 +8,7 @@ local utils = require 'nvim-treesitter.ts_utils'
 local parsers = require 'nvim-treesitter.parsers'
 
 -- plugin scoped vars
+local debug_mode = false
 local highlight_group = "BeepTest"
 local highlight_namespace = api.nvim_create_namespace('beep-test')
 local parser_cache = {}
@@ -16,6 +17,15 @@ local current_highlight = {}
 
 vim.cmd([[highlight default BeepTest guibg=red]])
 
+
+-- @private
+--
+-- Print when in debug_mode
+local function debug(text)
+    if debug_mode then
+        print(text)
+    end
+end
 
 -- @private
 --
@@ -101,8 +111,13 @@ local function flatten_node(root, results)
     results = results or {}
 
     for node, field in root:iter_children() do
-        table.insert(results, { node:range() })
-        flatten_node(node, results)
+        if node:type() ~= '\n' then
+            local entry = { node:range() }
+            table.insert(entry, node:type())
+
+            table.insert(results, entry)
+            flatten_node(node, results)
+        end
     end
 
     return results
@@ -119,7 +134,7 @@ local function random_ts_node(parser)
     local ast  = parser:parse()
     local root = ast[1]:root()
 
-    local flat = flatten_node(root, nil, 0)
+    local flat = flatten_node(root, nil)
 
     math.randomseed(os.time())
     return flat[math.random(#flat)]
@@ -153,6 +168,15 @@ local function loop()
         remove_highlight(buffer_no)
     end
 
+    debug(string.format(
+        "Highlight: row(%d, %d) col(%d, %d) type(%s)",
+        node_range[1],
+        node_range[2],
+        node_range[3],
+        node_range[4],
+        node_range[5]
+    ))
+
     flash_on()
     vim.defer_fn(flash_off, 200)
     vim.defer_fn(flash_on, 300)
@@ -175,7 +199,15 @@ if current_highlight == nil then
 
     local start_line, start_col, end_line, end_col = unpack(current_highlight)
 
-    print(line,col, start_line, start_col, end_line, end_col)
+    debug(string.format(
+        "Cursor Move: cursor(%d, %d) row(%d, %d) col(%d, %d)",
+        line,
+        col,
+        start_line,
+        start_col,
+        end_line,
+        end_col
+    ))
 
     if line >= start_line and line <= end_line then
         if line == start_line and line == end_line then
@@ -193,11 +225,15 @@ if current_highlight == nil then
 end
 
 -- start the beep test
-function M.start()
+function M.start(enable_debug)
     local buffer_no = api.nvim_get_current_buf()
     test_active     = true
+    debug_mode      = enable_debug or false
 
-    vim.cmd(string.format("autocmd CursorMoved <buffer=%d> lua require'nvim-beep-test'.on_move()", buffer_no))
+    vim.cmd(string.format(
+        "autocmd CursorMoved <buffer=%d> lua require'nvim-beep-test'.on_move()", 
+        buffer_no
+    ))
 
     loop()
 end
@@ -217,7 +253,6 @@ function M.on_move()
         return
     end
 
-    print("checking cursor")
     if cursor_in_highlight_range() then
         loop()
     end
