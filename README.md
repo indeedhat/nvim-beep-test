@@ -9,4 +9,4 @@ Once the cursor is over the highlight a new one will be selected
 
 ## Dependencies
 nvim >= 0.5.0\
-nvim_treesitter plugin
+nvim-treesitter plugin
