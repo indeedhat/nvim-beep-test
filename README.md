@@ -11,7 +11,10 @@ Once the cursor is over the highlight a new one will be selected
 Just require the package in your favourite manager and your good to go
 ```lua
 require('packer').startup(function()
-    use 'indeedhat/nvim-beep-test'
+    use {
+        'indeedhat/nvim-beep-test',
+        requires = 'nvim-treesitter/nvim-treesitter'
+    }
 end)
 ```
 
