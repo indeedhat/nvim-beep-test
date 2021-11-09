@@ -17,10 +17,10 @@ end)
 
 ## Usage
 Start the plugin\
-`:lua require'nvim-beep-test'.start()`
+`:BeepTestStart`
 
 Stop the plugin\
-`:lua require'nvim-beep-test'.stop()`
+`:BeepTestStop`
 
 ## Dependencies
 nvim >= 0.5.0\

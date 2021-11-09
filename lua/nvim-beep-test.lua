@@ -1,14 +1,13 @@
 -- global import
 local api = vim.api
 
-local M = {}
-
--- plugin import
-local utils = require 'nvim-treesitter.ts_utils'
+-- external plugin import
 local parsers = require 'nvim-treesitter.parsers'
 
+-- internal imports
+local debug = require 'nvim-beep-test.debug'
+
 -- plugin scoped vars
-local debug_mode = false
 local highlight_group = "BeepTest"
 local highlight_namespace = api.nvim_create_namespace('beep-test')
 local parser_cache = {}
@@ -17,15 +16,8 @@ local current_highlight = {}
 
 vim.cmd([[highlight default BeepTest guibg=red]])
 
-
--- @private
---
--- Print when in debug_mode
-local function debug(text)
-    if debug_mode then
-        print(text)
-    end
-end
+-- define the module for returns
+local M = {}
 
 -- @private
 --
@@ -43,13 +35,14 @@ end
 -- @param from tulple (line, column)
 -- @param to tulple (line, column)
 local function highlight_range(buffer_no, from, to)
-    remove_highlight(buffer_no)
     current_highlight = {
         from[1],
         from[2],
         to[1],
         to[2]
     }
+
+    remove_highlight(buffer_no)
     vim.highlight.range(buffer_no, highlight_namespace, highlight_group, from, to)
 end
 
@@ -142,7 +135,9 @@ end
 
 
 -- @privete
-local function loop()
+--
+-- Pick a random language node in the current buffer and highlight it
+local function pick_next_node()
     if not test_active then
         return
     end
@@ -168,14 +163,14 @@ local function loop()
         remove_highlight(buffer_no)
     end
 
-    debug(string.format(
+    debug.print(
         "Highlight: row(%d, %d) col(%d, %d) type(%s)",
         node_range[1],
         node_range[2],
         node_range[3],
         node_range[4],
         node_range[5]
-    ))
+    )
 
     flash_on()
     vim.defer_fn(flash_off, 200)
@@ -190,16 +185,15 @@ end
 --
 -- Check if the cursor is in the range of the current highlight
 local function cursor_in_highlight_range()
-if current_highlight == nil then
+    if current_highlight == nil then
         return false
     end
 
+    local start_line, start_col, end_line, end_col = unpack(current_highlight)
     local line, col = unpack(api.nvim_win_get_cursor(0))
     line = line - 1
 
-    local start_line, start_col, end_line, end_col = unpack(current_highlight)
-
-    debug(string.format(
+    debug.print(
         "Cursor Move: cursor(%d, %d) row(%d, %d) col(%d, %d)",
         line,
         col,
@@ -207,20 +201,18 @@ if current_highlight == nil then
         start_col,
         end_line,
         end_col
-    ))
+    )
 
-    if line >= start_line and line <= end_line then
-        if line == start_line and line == end_line then
-            return col >= start_col and col < end_col
-        elseif line == start_line then
-            return col >= start_col
-        elseif line == end_line then
-            return col < end_col
-        else
-            return true
-        end
-    else
+    if line < start_line or line > end_line then
         return false
+    elseif line == start_line and line == end_line then
+        return col >= start_col and col < end_col
+    elseif line == start_line then
+        return col >= start_col
+    elseif line == end_line then
+        return col < end_col
+    else
+        return true
     end
 end
 
@@ -228,14 +220,15 @@ end
 function M.start(enable_debug)
     local buffer_no = api.nvim_get_current_buf()
     test_active     = true
-    debug_mode      = enable_debug or false
+
+    debug.enable(enable_debug or false)
 
     vim.cmd(string.format(
         "autocmd CursorMoved <buffer=%d> lua require'nvim-beep-test'.on_move()", 
         buffer_no
     ))
 
-    loop()
+    pick_next_node()
 end
 
 -- stop the beep test
@@ -254,7 +247,7 @@ function M.on_move()
     end
 
     if cursor_in_highlight_range() then
-        loop()
+        pick_next_node()
     end
 end
 
